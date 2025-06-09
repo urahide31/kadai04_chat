@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>LINE風Chatアプリ</title>
+<link rel="stylesheet" href="css/style.css">
+<!-- <style>
+  .input-error {
+    border: 2px solid red;
+    background-color: #ffecec;
+  }
+</style> -->
+
+</head>
+<body>
+
+<!-- コンテンツ表示画面 -->
+
+<div class="container">
+  <div class="chat-area">
+     <div id="output" style="overflow: auto"></div>
+  </div>
+  <!-- <div class="chat-area">
+     <div id="output" style="overflow: auto"></div>
+  </div> -->
+    
+    <div class="text-area">
+      <div> 名前：<input class="name-area" type="text" id="uname"> </div>
+      <div class="text-submit">
+        <textarea class="text-box" id="text" cols="30" rows="5"></textarea>
+        <button class="button" id="send">送信</button>
+      </div>
+    </div>
+    
+    <div id="error" style="color: red; margin-top: 10px; display: none;"></div>
+    
+</div>
+<!--/ コンテンツ表示画面 -->
+
+
+
+<!-- JQuery -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<!-- JQuery -->
+
+
+<!--** 以下Firebase **-->
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+  import { getDatabase, ref, push, set, onChildAdded, update, remove, onChildChanged, onChildRemoved } 
+  from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "*********************************",
+    authDomain: "*************",
+    projectId: "*************",
+    storageBucket: "***************************",
+    messagingSenderId: "*****************",
+    appId: "******************************"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const dbRef = ref(db,"chat");
+
+  $("#send").on("click",function(){
+    const unameEl = $("#uname");
+    const textEl = $("#text");
+    const uname = unameEl.val().trim();
+    const text = textEl.val().trim();
+
+    // 👇 エラーメッセージ初期化
+    $("#error").stop(true, true).hide();
+    unameEl.removeClass("input-error");
+    textEl.removeClass("input-error");
+
+    // 空欄チェック
+  let hasError = false;
+  if (!uname) {
+    unameEl.addClass("input-error");
+    hasError = true;
+  }
+  if (!text) {
+    textEl.addClass("input-error");
+    hasError = true;
+  }
+  if (hasError) {
+    $("#error")
+      .text("名前とメッセージの両方を入力してください。")
+      .fadeIn(200)
+      .delay(3000)
+      .fadeOut(500);
+    return;
+  }
+
+// 入力時に赤枠を自動で解除
+$("#uname, #text").on("input", function () {
+  if ($(this).val().trim() !== "") {
+    $(this).removeClass("input-error");
+  }
+});
+
+
+  const msg = {
+    uname: uname,
+    text: text,
+    date: new Date().toLocaleString()
+    // time: new Date().toLocaleTimeString()
+    //toLocaleString
+  };
+
+  const newPostRef = push(dbRef);
+  set(newPostRef, msg);
+
+  // 入力リセット
+  $("#uname").val("");
+  $("#text").val("");
+  $("#error").stop(true, true).hide(); // 念のためエラーも非表示
+
+  // スクロール
+  setTimeout(() => {
+    const output = $("#output");
+    output.scrollTop(output[0].scrollHeight);
+  }, 100);
+});
+
+  onChildAdded(dbRef,function(data){
+    const msg = data.val();
+    const key = data.key;
+    let h  = `<p class="chat-bubble__section" id=${key}>`;
+        // h += `投稿日時：${msg.date}`;
+        // h += '<br>';
+        // h += `名前：${msg.uname}`;
+        // h += '<br>';
+        h += `<span class="chat-bubble__text right" contentEditable="true" id="${key}_update">${msg.text}</span>`;
+        h += `<span class="remove" data-key="${key}">🆑</span>`;
+        h += `<span class="update" data-key="${key}">🆙</span>`;
+        h += '</p>'; 
+        $("#output").append(h);
+
+        const output = $("#output");
+        output.scrollTop(output[0].scrollHeight);
+  });
+
+//データ削除
+$("#output").on("click", ".remove",function(){
+    const key = $(this).attr("data-key");
+    const remove_item = ref(db,`chat/${key}`);
+    remove(remove_item);
+});
+
+//データ更新
+$("#output").on("click", ".update",function(){
+    const key = $(this).attr("data-key");
+    update(ref(db,`chat/${key}`), {
+        text: $(`#${key}_update`).html()
+    });
+});
+
+//削除処理実施時のイベント
+onChildRemoved(dbRef, (data) => {
+    $(`#${data.key}`).remove();
+});
+
+//更新処理実施時のイベント
+onChildChanged(dbRef, (data) => {
+    $(`#${data.key}_update`).html(data.val().text);
+    $(`#${data.key}_update`).fadeOut(800).fadeIn(800);
+});
+</script>
+
+</body>
+</html>
